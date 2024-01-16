@@ -143,6 +143,10 @@ func (s *MSPMessageCryptoService) VerifyBlock(chainID common.ChainID, seqNum uin
 		return fmt.Errorf("Failed unmarshalling medatata for signatures [%s]", err)
 	}
 
+	if err := utils.VerifyTransactionsAreWellFormed(block); err != nil {
+		return fmt.Errorf("block has malformed transactions: %v", err)
+	}
+
 	// - Verify that Header.DataHash is equal to the hash of block.Data
 	// This is to ensure that the header is consistent with the data carried by this block
 	if !bytes.Equal(block.Data.Hash(), block.Header.DataHash) {

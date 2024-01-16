@@ -292,7 +292,17 @@ func UnmarshalSignatureHeaderOrPanic(bytes []byte) *cb.SignatureHeader {
 // IsConfigBlock validates whenever given block contains configuration
 // update transaction
 func IsConfigBlock(block *cb.Block) bool {
-	envelope, err := ExtractEnvelope(block, 0)
+	if block.Data == nil {
+		return false
+	}
+
+	if len(block.Data.Data) != 1 {
+		return false
+	}
+
+	marshaledEnvelope := block.Data.Data[0]
+	envelope, err := GetEnvelopeFromBlock(marshaledEnvelope)
+
 	if err != nil {
 		return false
 	}

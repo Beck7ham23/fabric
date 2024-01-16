@@ -8,6 +8,7 @@ package cluster
 
 import (
 	"bytes"
+	"fmt"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -294,6 +295,11 @@ func VerifyBlockHash(indexInBuffer int, blockBuff []*common.Block) error {
 		return errors.New("missing block header")
 	}
 	seq := block.Header.Number
+
+	if err := utils.VerifyTransactionsAreWellFormed(block); err != nil && block.Header.Number > 0 {
+		return fmt.Errorf("block has malformed transactions: %v", err)
+	}
+
 	dataHash := block.Data.Hash()
 	// Verify data hash matches the hash in the header
 	if !bytes.Equal(dataHash, block.Header.DataHash) {

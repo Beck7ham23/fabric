@@ -7,6 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 package utils
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	cb "github.com/hyperledger/fabric/protos/common"
 	"github.com/pkg/errors"
@@ -121,4 +126,51 @@ func InitBlockMetadata(block *cb.Block) {
 			block.Metadata.Metadata = append(block.Metadata.Metadata, []byte{})
 		}
 	}
+}
+
+func VerifyTransactionsAreWellFormed(block *cb.Block) error {
+	if block == nil || block.Data == nil || len(block.Data.Data) == 0 {
+		return fmt.Errorf("empty block")
+	}
+
+	// If we have a single transaction, and the block is a config block, then no need to check
+	// well formed-ness, because there cannot be another transaction in the original block.
+	if IsConfigBlock(block) {
+		return nil
+	}
+
+	for i, rawTx := range block.Data.Data {
+		env := &cb.Envelope{}
+		if err := proto.Unmarshal(rawTx, env); err != nil {
+			return fmt.Errorf("transaction %d is invalid: %v", i, err)
+		}
+
+		if len(env.Payload) == 0 {
+			return fmt.Errorf("transaction %d has no payload", i)
+		}
+
+		if len(env.Signature) == 0 {
+			return fmt.Errorf("transaction %d has no signature", i)
+		}
+
+		expected, err := proto.Marshal(env)
+		if err != nil {
+			return fmt.Errorf("failed re-marshaling envelope: %v", err)
+		}
+
+		if len(expected) < len(rawTx) {
+			return fmt.Errorf("transaction %d has %d trailing bytes", i, len(rawTx)-len(expected))
+		}
+		if !bytes.Equal(expected, rawTx) {
+			return fmt.Errorf("transaction %d (%s) does not match its raw form (%s)", i,
+				base64.StdEncoding.EncodeToString(expected), base64.StdEncoding.EncodeToString(rawTx))
+		}
+	}
+
+	return nil
+}
+
+func BlockDataHash(b *cb.BlockData) []byte {
+	sum := sha256.Sum256(bytes.Join(b.Data, nil))
+	return sum[:]
 }
